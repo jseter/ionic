@@ -6,6 +6,29 @@ import { NavOptions, STATE_ATTACHED, STATE_DESTROYED, STATE_INITIALIZED, STATE_N
 import { NavParams } from './nav-params';
 import { Content, Footer, Header, Navbar } from './nav-interfaces';
 
+class OrientationChangeSubscription {
+    private _closed: boolean;
+    private _listener?: EventListenerOrEventListenerObject;
+
+    protected constructor(listener: EventListenerOrEventListenerObject) {
+        this._listener = listener;
+        this._closed = false;
+    }
+
+    unsubscribe(): void {
+        if(this._closed === true)
+            return;
+        const listener = this._listener;
+        this._closed = true;
+        delete this._listener;
+        window.removeEventListener('orientationchange', listener);        
+    }
+
+    static subscribe(listener: EventListenerOrEventListenerObject): OrientationChangeSubscription {
+        window.addEventListener('orientationchange', listener);
+        return new OrientationChangeSubscription(listener);
+    }
+}
 
 /**
  * @name ViewController
@@ -40,6 +63,7 @@ export class ViewController {
   private _dismissData: any;
   private _dismissRole: string;
   private _detached: boolean;
+  private _orientationChangeSubscription: OrientationChangeSubscription;
 
   _cmp: ComponentRef<any>;
   _nav: NavController;
@@ -113,12 +137,12 @@ export class ViewController {
 
     this._cssClass = rootCssClass;
     this._ts = Date.now();
-    window.addEventListener('orientationchange', this.handleOrientationChange.bind(this));
   }
 
   handleOrientationChange() {
-    if (this.getContent()) {
-      this.getContent().resize();
+    const content = this.getContent();
+    if (content) {
+      content.resize();
     }
   }
 
@@ -131,6 +155,7 @@ export class ViewController {
     this._cmp = componentRef;
     this.instance = this.instance || componentRef.instance;
     this._detached = false;
+    this._orientationChangeSubscription = OrientationChangeSubscription.subscribe(this.handleOrientationChange.bind(this));
   }
 
   _setNav(navCtrl: NavController) {
@@ -542,7 +567,10 @@ export class ViewController {
         renderer.setElementAttribute(cmpEle, 'style', null);
       }
 
-      window.removeEventListener('orientationchange', this.handleOrientationChange.bind(this));
+      const orientationChangeSubscription = this._orientationChangeSubscription;
+      delete this._orientationChangeSubscription;
+      if(orientationChangeSubscription)
+        orientationChangeSubscription.unsubscribe();
       // completely destroy this component. boom.
       this._cmp.destroy();
     }
