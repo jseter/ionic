@@ -8,6 +8,10 @@ import { BlockerDelegate, GESTURE_GO_BACK_SWIPE, GESTURE_MENU_SWIPE,  GestureCon
 import { ModuleLoader } from '../../util/module-loader';
 import { assert } from '../../util/util';
 
+interface EventEmitterSubscription {
+    unsubscribe(): void;
+}
+
 /**
  * @hidden
  */
@@ -20,7 +24,8 @@ import { assert } from '../../util/util';
     '</div>'
 })
 export class ModalCmp {
-
+  private _willEnterSubscription: EventEmitterSubscription;
+  private _didLeaveSubscription: EventEmitterSubscription;
   @ViewChild('viewport', { read: ViewContainerRef }) _viewport: ViewContainerRef;
 
   _bdDismiss: boolean;
@@ -76,8 +81,8 @@ export class ModalCmp {
     // Lifecycle events will be sent to the new instance, instead of the modal's component
     // we need to manually subscribe to them
     this._viewCtrl._setInstance(componentRef.instance);
-    this._viewCtrl.willEnter.subscribe(this._viewWillEnter.bind(this));
-    this._viewCtrl.didLeave.subscribe(this._viewDidLeave.bind(this));
+    this._willEnterSubscription = this._viewCtrl.willEnter.subscribe(this._viewWillEnter.bind(this));
+    this._didLeaveSubscription = this._viewCtrl.didLeave.subscribe(this._viewDidLeave.bind(this));
 
     this._enabled = true;
   }
@@ -113,5 +118,13 @@ export class ModalCmp {
   ngOnDestroy() {
     assert(this._gestureBlocker.blocked === false, 'gesture blocker must be already unblocked');
     this._gestureBlocker.destroy();
+    const willEnterSubscription = this._willEnterSubscription;
+    delete this._willEnterSubscription;
+    if(willEnterSubscription != null)
+        willEnterSubscription.unsubscribe();
+    const didLeaveSubscription = this._didLeaveSubscription;
+    delete this._didLeaveSubscription;
+    if(didLeaveSubscription != null)
+        didLeaveSubscription.unsubscribe();
   }
 }
