@@ -8,6 +8,10 @@ import { BLOCK_ALL, BlockerDelegate, GestureController } from '../../gestures/ge
 import { ModuleLoader } from '../../util/module-loader';
 import { assert } from '../../util/util';
 
+interface EventEmitterSubscription {
+    unsubscribe(): void;
+}
+
 /**
  * @hidden
  */
@@ -25,7 +29,8 @@ import { assert } from '../../util/util';
     '</div>'
 })
 export class PopoverCmp {
-
+  private _willEnterSubscription: EventEmitterSubscription;
+  private _didLeaveSubscription: EventEmitterSubscription;
   @ViewChild('viewport', {read: ViewContainerRef}) _viewport: ViewContainerRef;
 
   d: {
@@ -83,8 +88,8 @@ export class PopoverCmp {
 
       // Subscribe to events in order to block gestures
       // TODO, should we unsubscribe? memory leak?
-      this._viewCtrl.willEnter.subscribe(this._viewWillEnter.bind(this));
-      this._viewCtrl.didLeave.subscribe(this._viewDidLeave.bind(this));
+      this._willEnterSubscription = this._viewCtrl.willEnter.subscribe(this._viewWillEnter.bind(this));
+      this._didLeaveSubscription = this._viewCtrl.didLeave.subscribe(this._viewDidLeave.bind(this));
     }
   }
 
@@ -116,6 +121,16 @@ export class PopoverCmp {
   ngOnDestroy() {
     assert(this._gestureBlocker.blocked === false, 'gesture blocker must be already unblocked');
     this._gestureBlocker.destroy();
+
+    const willEnterSubscription = this._willEnterSubscription;
+    delete this._willEnterSubscription;
+    if(willEnterSubscription != null)
+        willEnterSubscription.unsubscribe();
+
+    const didLeaveSubscription = this._didLeaveSubscription;
+    delete this._didLeaveSubscription;
+    if(didLeaveSubscription != null)
+        didLeaveSubscription.unsubscribe();
   }
 }
 
